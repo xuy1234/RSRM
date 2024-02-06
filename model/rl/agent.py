@@ -1,28 +1,34 @@
 import copy
 import random
-from collections import defaultdict
+from typing import Dict, List, Tuple
 
 from model.config import Config
-from model.exps.expTree import FloorTree
-from model.exps.calculator import cal_expression
+from model.expr_utils.exp_tree import LevelTree
+from model.expr_utils.calculator import cal_expression
+from model.expr_utils.exp_tree_node import Expression
 
 
 class Agent:
+    """
+    Monte Carlo Tree Search Algorithm Implementation Class
+    """
+
     def __init__(self, config_s: Config):
         self.config_s = config_s
-        self.expression_dict = config_s.exp_dict
+
+        self.tree = LevelTree()
+        self.expressions: List[Tuple[float, List[int]]] = []
+        self.exp_last: str = ""
+
         self.max_parameter = config_s.mcts.max_const
-        self.generate_dict = defaultdict(int)
         self.max_height = config_s.mcts.max_height
         self.max_token = config_s.mcts.max_token
         self.discount = config_s.mcts.token_discount
-        self.tree = FloorTree()
-        self.expressions = []
-        self.exp_last = ""
+        self.expression_dict: Dict[int, Expression] = config_s.exp_dict
 
-    def get_exps_full(self, num=None):
+    def get_exps_full(self, num=None) -> List[Tuple[float, List[int]]]:
         """
-        获取效果最好的num个表达式和value
+        Get the best num expression and loss value.
         """
         if num is None:
             num = self.config_s.mcts.max_exp_num
@@ -30,9 +36,9 @@ class Agent:
         self.expressions = []
         return ans
 
-    def get_exps(self, num=None):
+    def get_exps(self, num=None) -> List[List[int]]:
         """
-        获取效果最好的num个表达式
+        Get the best num expression.
         """
         if num is None:
             num = self.config_s.mcts.max_exp_num
@@ -43,47 +49,52 @@ class Agent:
 
     def reward(self, tree=None, reward=True):
         """
-        计算语法树当前表达式reward
+        Compute the current expression in the expression tree reward
+        :param tree: input expression tree
+        :param reward: return discount ** length_of_expr / (1 + rmse) if reward is True else rmse
+        :return: reward or rmse of tree
         """
         try:
             if not tree:
                 tree = self.tree
             if not tree.is_full():
-                raise TimeoutError
+                print(tree.token_list_pre)
+                raise RuntimeError
             pre = tree.token_list_pre
-            l = len(pre)
-            if l <= 5:
+            length_of_expr = len(pre)
+            if length_of_expr <= 5:
                 return 0 if reward else 1e999
             symbols = tree.get_exp()
             if self.exp_last:
                 symbols = f"{self.exp_last}({symbols})"
             ans_tol = cal_expression(symbols, self.config_s)
-            val = self.discount ** l / (1 + ans_tol)
+            val = self.discount ** length_of_expr / (1 + ans_tol)
             if pre not in [i[1] for i in self.expressions]:
                 self.expressions.append((ans_tol, pre))
         except TimeoutError:
             val = 0
             ans_tol = 1e999
-        if reward: return val
+        if reward:
+            return val
         return ans_tol
 
     def reset(self):
         """
-        重置语法树
+        reset expression tree
         """
-        self.clear()
+        self.tree = LevelTree()
         return [0], self.unavailable()
 
-    def unavailable(self):
+    def unavailable(self) -> List[int]:
         """
-        计算当前不可选的token集合
+        Calculate the set of currently unselectable tokens
         """
         self.tree.trim()
         exps = []
         ans = []
         if self.tree.depth() > self.max_height:
-            return list(range(len(self.expression_dict)))
-        if self.tree.triangle_count > 0 or self.tree.depth() <= 0:
+            return [i for i, j in self.expression_dict.items() if j.child != 0]
+        if self.tree.tri_count > 0 or self.tree.depth() <= 0:
             exps.extend(["Cos", "Sin"])
         if self.tree.head_token == "Exp":
             exps.append('Log')
@@ -96,9 +107,9 @@ class Agent:
                 ans.append(i)
         return ans
 
-    def predict(self):
+    def predict(self) -> float:
         """
-        随机填满整棵语法树计算期望reward
+        Randomly fill the whole expression tree to compute the expectation reward
         """
         tol = range(len(self.expression_dict))
         tree = copy.deepcopy(self.tree)
@@ -110,33 +121,25 @@ class Agent:
         self.tree = tree
         return reward
 
-    def change_exp(self, expr):
+    def change_form(self, expr) -> None:
         """
-        修改当前模式
+        change the current expression form
         """
         self.exp_last = expr
 
-    def add_token(self, token):
+    def add_token(self, token) -> None:
         """
-        添加新的token
+        add new token to the expression tree
         """
         self.tree.add_exp(self.expression_dict[token])
 
-    def step(self, token):
+    def step(self, token) -> Tuple[float, bool, List[int]]:
         """
-        添加新的token，返回reward，是否结束，不可选的子节点
+        Add new token
+        :return: reward, end or not, indexes of unselectable child nodes
         """
         self.add_token(token)
         if self.tree.is_full():
             return self.reward(), True, []
-        un = self.unavailable()
-        if len(un) == len(self.expression_dict):
-            return -1, True, []
-        else:
-            return - 0.1, False, un
-
-    def clear(self):
-        """
-        清空语法树
-        """
-        self.tree = FloorTree()
+        unavail = self.unavailable()
+        return - 0.1, False, unavail

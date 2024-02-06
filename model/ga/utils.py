@@ -1,52 +1,39 @@
+from typing import List
+
 import numpy as np
 from deap import gp
 
 
-def DEAP_to_tokens(individual):
+def deap_to_tokens(individual: gp.PrimitiveTree) -> np.array:
     """
     Convert individual to tokens.
-
-    Parameters
-    ----------
-
-    individual : gp.PrimitiveTree
-        The DEAP individual.
-
-    Returns
-    -------
-
-    tokens : np.array
-        The tokens corresponding to the individual.
+    :param individual: gp.PrimitiveTree The DEAP individual.
+    :return: np.array The tokens corresponding to the individual.
     """
-
     tokens = np.array([i.name[3:] for i in individual], dtype=np.int32)
     return tokens
 
 
-def tokens_to_DEAP(tokens, pset):
+def tokens_to_deap(tokens: List[int], pset) -> gp.PrimitiveTree:
     """
-    Convert DSO tokens into DEAP individual.
-
-    Parameters
-    ----------
-    tokens : np.ndarray
-        Tokens corresponding to the individual.
-
-    pset : gp.PrimitiveSet
-        Primitive set upon which to build the individual.
-
-    Returns
-    _______
-    individual : gp.PrimitiveTree
-        The DEAP individual.
+    Convert list of tokens into DEAP individual.
+    :param tokens: Tokens corresponding to the individual.
+    :param pset: Primitive set upon which to build the individual.
+    :return: The DEAP individual.
     """
     plist = [pset.mapping[f"exp{t}"] for t in tokens]
     individual = gp.PrimitiveTree(plist)
     return individual
 
 
-def multi_mutate(individual, expr, pset):
-    """Randomly select one of four types of mutation."""
+def multi_mutate(individual: gp.PrimitiveTree, expr, pset):
+    """
+    Randomly select one of four types of mutation
+    :param individual: DEAP individual
+    :param expr:  A function object that can generate an expression when called.
+    :param pset: Primitive set upon which to build the individual
+    :return: DEAP individual after mutation
+    """
     v = np.random.randint(0, 4)
     if v == 0:
         individual = gp.mutUniform(individual, expr, pset)
@@ -60,11 +47,11 @@ def multi_mutate(individual, expr, pset):
     return individual
 
 
-def pre_to_floor(token_list, expr_dict):
+def pre_to_level(token_list, expr_dict):
     """
-    先序遍历转层序遍历
-    :param token_list: 先序遍历
-    :param expr_dict: 表达式字典
+    Pre-order to Level-order Traversal
+    :param token_list: List of Pre-order traversal
+    :param expr_dict: Expression Dictionary
     """
     son = [[] for _ in token_list]
     stack = []
@@ -83,11 +70,11 @@ def pre_to_floor(token_list, expr_dict):
     return ans
 
 
-def floor_to_pre(token_list, expr_dict):
+def level_to_pre(token_list, expr_dict):
     """
-    层序遍历转先序遍历
-    :param token_list: 层序遍历
-    :param expr_dict: 表达式字典
+    Level-order to Pre-order Traversal
+    :param token_list: List of Level-order Traversal
+    :param expr_dict: Expression Dictionary
     """
     son = [[] for _ in token_list]
     queue = []

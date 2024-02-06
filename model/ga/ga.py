@@ -1,11 +1,14 @@
 import operator
 import random
+from typing import List
 
 from deap import gp, algorithms
 from deap import tools
 from deap import creator
 from deap import base
-from model.exps.exp_tree_node import Expression
+
+from model.config import Config
+from model.expr_utils.exp_tree_node import Expression
 from model.ga.agent import Agent as Game_GA
 import model.ga.utils as utils
 
@@ -13,15 +16,10 @@ run = False
 
 
 class GAPipeline:
-    def __init__(self, config_s):
+    def __init__(self, config_s: Config):
         """
-        初始化遗传算法
+        Initializing the genetic algorithm
         """
-        global run
-        if not run:
-            run = True  # 初始化遗传工具箱
-            creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-            creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin)
         self.exp_dict = config_s.exp_dict
         toolbox = base.Toolbox()
         self.config_s = config_s
@@ -30,7 +28,7 @@ class GAPipeline:
         pset = gp.PrimitiveSet("MAIN", var_num)
         var_count = 0
         """
-        初始化遗传算法tokens
+        Initializing the tokens of genetic algorithm
         """
         for num, exp in self.exp_dict.items():
             if not isinstance(exp, Expression): continue
@@ -40,8 +38,13 @@ class GAPipeline:
             else:
                 pset.addPrimitive(exp.func, exp.child, name=f"exp{num}")
         """
-        初始化遗传算法工具箱
+        Initializing the toolbox of genetic algorithm
         """
+        global run
+        if not run:
+            run = True
+            creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+            creator.create("Individual", gp.PrimitiveTree, fitness=creator.FitnessMin)
         toolbox.register("expr", gp.genHalfAndHalf, pset=pset, min_=1, max_=2)
         toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.expr)
         toolbox.register("population", tools.initRepeat, list, toolbox.individual)
@@ -57,18 +60,18 @@ class GAPipeline:
         self.toolbox = toolbox
         self.pset = pset
 
-    def ga_play(self, pop_init):
+    def ga_play(self, pop_init: List[List[int]]) -> List[List[int]]:
         """
-        遗传算法运行类
-        :param pop_init: 部分初始种群
-        :return: 遗传算法结果
+        Genetic Algorithm Run Function
+        :param pop_init: part of the initial population
+        :return: Result of the genetic algorithm(list of token list)
         """
         hof = tools.HallOfFame(20)
         pops = pop_init
         pop = self.config_s.gp.pops
         if len(pops) >= pop // 2: pops = random.sample(pops, pop // 2)
-        pops = [creator.Individual(utils.tokens_to_DEAP(p, self.pset)) for p in pops]
+        pops = [creator.Individual(utils.tokens_to_deap(p, self.pset)) for p in pops]
         pops += self.toolbox.population(n=pop - len(pops))
-        pop, log = algorithms.eaSimple(pops, self.toolbox, self.config_s.gp.cxpb, self.config_s.gp.mutpb,
-                                       self.config_s.gp.times, halloffame=hof, verbose=False)
-        return [utils.DEAP_to_tokens(tokens) for tokens in hof]
+        _ = algorithms.eaSimple(pops, self.toolbox, self.config_s.gp.cxpb, self.config_s.gp.mutpb,
+                                self.config_s.gp.times, halloffame=hof, verbose=False)
+        return [utils.deap_to_tokens(tokens) for tokens in hof]

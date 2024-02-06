@@ -4,20 +4,18 @@ from pandas import read_csv
 from model.config import Config
 from model.pipeline import Pipeline
 
-
-def pipeline(csv_1, csv_2, const=False):
+def pipeline(csv_1, csv_2):
     """
-    主函数 用于生成表达式
-    :param csv_1: train csv文件 ， 分割
-    :param csv_2: test csv文件 ， 分割
-    :param const: 是否需要参数
+    Expression generation function in demo, input csv address, output the best expression and error by RSRM.
+    :param csv_1: train csv file split by comma
+    :param csv_2: test csv file split by comma
+    :param const: True for using parameters with parameter optimization, False vice versa
     """
     csv1, csv2 = read_csv(csv_1, header=None), read_csv(csv_2, header=None)
     x, t = np.array(csv1).T[:-1], np.array(csv1).T[-1]
     x_test, t_test = np.array(csv2).T[:-1], np.array(csv2).T[-1]
     config = Config()
-    config.init()
-    config.config_basic(const_opt=const, consts=const, verbose=True)
+    config.json("../config/config.json")
     config.set_input(x=x, t=t, x_=x_test, t_=t_test)
     model = Pipeline(config=config)
     best_exp, rmse = model.fit()
@@ -25,4 +23,4 @@ def pipeline(csv_1, csv_2, const=False):
 
 
 if __name__ == '__main__':
-    pipeline("nyugen/4_train.csv", "nyugen/4_test.csv", False)
+    pipeline("../data/nguyen/11_train.csv", "../data/nguyen/11_test.csv")
